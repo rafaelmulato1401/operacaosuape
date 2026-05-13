@@ -169,6 +169,14 @@ tbody td{padding:8px 13px;white-space:nowrap}
 .role-badge{padding:3px 10px;border-radius:20px;font-size:10.5px;font-weight:700}
 .role-master{background:rgba(139,92,246,.15);color:var(--purple)}.role-user{background:rgba(77,140,245,.15);color:var(--blue)}
 
+
+.profile-field{margin-bottom:14px}
+.profile-field label{display:block;font-size:11.5px;font-weight:600;color:var(--txt2);margin-bottom:5px}
+.profile-field input{width:100%;padding:10px 14px;background:var(--s2);border:1px solid var(--border);
+  color:var(--txt);border-radius:var(--rs);font-family:inherit;font-size:14px;outline:none;transition:border-color .15s}
+.profile-field input:focus{border-color:var(--blue)}
+.profile-field small{font-size:11px;color:var(--txt3);margin-top:4px;display:block}
+
 </style>
 </head>
 <body>
@@ -408,6 +416,41 @@ tbody td{padding:8px 13px;white-space:nowrap}
   </div>
 </main>
 
+
+<!-- MODAL EDITAR PERFIL -->
+<div class="mo" id="mo-edit-profile">
+  <div class="md" style="max-width:440px">
+    <div class="mh">
+      <div class="mh-title">Editar Meu Perfil</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('mo-edit-profile')">x</button>
+    </div>
+    <div class="mb">
+      <div id="profile-edit-error" class="login-error" style="margin-bottom:14px"></div>
+      <div class="profile-field">
+        <label>Nome completo</label>
+        <input type="text" id="ep-name" placeholder="Seu nome">
+      </div>
+      <div class="profile-field">
+        <label>E-mail</label>
+        <input type="email" id="ep-email" placeholder="seu@email.com">
+        <small>Ao alterar o e-mail sera necessario fazer login novamente.</small>
+      </div>
+      <div class="profile-field">
+        <label>Nova senha <span style="color:var(--txt3);font-weight:400">(deixe em branco para nao alterar)</span></label>
+        <input type="password" id="ep-password" placeholder="Minimo 6 caracteres">
+      </div>
+      <div class="profile-field">
+        <label>Confirmar nova senha</label>
+        <input type="password" id="ep-password2" placeholder="Repita a senha">
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="closeModal('mo-edit-profile')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-profile" onclick="saveProfile()">Salvar alteracoes</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-wrap" id="toast-wrap"></div>
 
 <!-- MODAL USER MENU -->
@@ -422,7 +465,8 @@ tbody td{padding:8px 13px;white-space:nowrap}
         <span class="role-badge" id="user-menu-role-badge" style="margin-top:8px;display:inline-block"></span>
       </div>
     </div>
-    <div class="mf" style="justify-content:center">
+    <div class="mf" style="justify-content:space-between">
+      <button class="btn btn-ghost" onclick="closeModal('mo-user-menu');openEditProfile()">Editar perfil</button>
       <button class="btn btn-danger" onclick="doLogout()">Sair do sistema</button>
     </div>
   </div>
@@ -1061,13 +1105,22 @@ function handleImport(input){
       const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
       let newE=[],newSD=[],newSR=[];
 
-      wb.SheetNames.forEach(name=>{
-        const ws=wb.Sheets[name];
+      // Normaliza nome removendo acentos e espacos para comparacao segura
+      const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+
+      wb.SheetNames.forEach(sheetName=>{
+        const nameNorm=norm(sheetName);
+        const ws=wb.Sheets[sheetName];
         const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
         if(!rows.length)return;
-        const firstRow=rows[0];
-        const cols=Object.keys(firstRow).map(c=>String(c).trim().toUpperCase());
-        const nameUp=name.trim().toUpperCase().replace(/[^A-Z0-9_]/g,'_');
+
+        // Detecta tipo EXCLUSIVAMENTE pelo nome da aba (normalizado)
+        const isEntradas  = nameNorm==='ENTRADAS';
+        const isRodo      = nameNorm==='SAIDAS_RODO' || nameNorm==='SAIDAS RODO';
+        const isSaidaDiv  = nameNorm==='SAIDAS_DIVERSOS' || nameNorm==='SAIDAS DIVERSOS';
+
+        // Se nao for nenhuma das 3 abas operacionais, ignora
+        if(!isEntradas && !isRodo && !isSaidaDiv) return;
 
         const fmtVal=v=>{
           if(v===''||v===null||v===undefined)return'';
@@ -1076,80 +1129,85 @@ function handleImport(input){
           if(/^\d{5}$/.test(s)){const d=new Date((parseInt(s)-25569)*86400000);return d.toISOString().slice(0,10);}
           return s;
         };
+
+        // Busca chave no registro ignorando acentos e case
         const findKey=(r,k)=>{
-          if(k in r)return r[k];
-          const match=Object.keys(r).find(rk=>rk.trim()===k);
-          return match?r[match]:'';
+          if(k in r) return r[k];
+          const kn=norm(k);
+          const match=Object.keys(r).find(rk=>norm(rk)===kn);
+          return match!==undefined ? r[match] : '';
         };
-        const toRec=(r,keys)=>{const rec={};keys.forEach(k=>{rec[k]=fmtVal(findKey(r,k))});return rec;};
 
-        // ENTRADAS: nome da aba ou colunas TIPO+MODAL+TIPO2 sem CLIENTE/TERMINAL
-        const isEntradas=nameUp==='ENTRADAS'||(cols.includes('TIPO')&&cols.includes('MODAL')&&cols.includes('TIPO2')&&!cols.includes('CLIENTE/TERMINAL'));
-
-        // SAIDAS_RODO: nome da aba ou tem campo de programacao
-        const isRodo=nameUp==='SA_DAS_RODO'||nameUp==='SAIDAS_RODO'||nameUp==='SA_DAS_DIVERSOS_RODO'||
-                     cols.some(c=>c.includes('PROGRAMA'));
-
-        // SAIDAS_DIVERSOS: tem CLIENTE/TERMINAL, nao tem programacao, nao tem TIPO (ou seja, nao eh rodo)
-        const isSaidaDiv=nameUp==='SA_DAS_DIVERSOS'||nameUp==='SAIDAS_DIVERSOS'||
-                         (cols.includes('CLIENTE/TERMINAL')&&!isRodo&&!isEntradas);
+        const toRec=(r,keys)=>{
+          const rec={};
+          keys.forEach(k=>{rec[k]=fmtVal(findKey(r,k))});
+          return rec;
+        };
 
         if(isEntradas){
+          // Usa somente as primeiras 13 colunas (ignora TIPO.1, MODAL.1, TIPO2.1)
           const KEYS=['TIPO','MODAL','TIPO2','PRODUTO','DATA DE REFERENCIA','DATA',
                       'GEF ORIGEM','GEF','TERMINAL ORIGEM','TERMINAL DESTINO',
                       'QUANTIDADE','TEXTO LIVRE','STATUS'];
           rows.forEach(r=>{
             const rec=toRec(r,KEYS);
-            if((rec['MODAL']||'').toUpperCase()==='TRANSF USINAS')return;
-            if((rec['TIPO2']||'').toUpperCase()==='TRANSF USINAS')return;
-            if(!rec['TIPO']&&!rec['QUANTIDADE'])return;
+            if((rec['MODAL']||'').toUpperCase()==='TRANSF USINAS') return;
+            if((rec['TIPO2']||'').toUpperCase()==='TRANSF USINAS') return;
+            if(!rec['TIPO'] && !rec['QUANTIDADE']) return;
             newE.push(rec);
           });
-        } else if(isRodo&&cols.includes('CLIENTE/TERMINAL')){
+
+        } else if(isRodo){
           const KEYS=['CLIENTE/TERMINAL','TIPO','PRODUTO','DATA','GEF','TERMINAL ORIGEM',
                       'QUANTIDADE','NF VENDA INPASA','TEXTO LIVRE',
                       'N\u00ba PROGRAMA\u00c7\u00c3O ULTRACARGO','SEMANA','MODAL',
                       'TERMINAL DESTINO','STATUS','RETORNO'];
           rows.forEach(r=>{
             const rec=toRec(r,KEYS);
-            // also try without accents
+            // fallback para campo de programacao com grafia diferente
             if(!rec['N\u00ba PROGRAMA\u00c7\u00c3O ULTRACARGO']){
-              const altKey=Object.keys(r).find(k=>k.toUpperCase().includes('PROGRAMA'));
-              if(altKey) rec['N\u00ba PROGRAMA\u00c7\u00c3O ULTRACARGO']=fmtVal(r[altKey]);
+              const alt=Object.keys(r).find(k=>norm(k).includes('PROGRAMA'));
+              if(alt) rec['N\u00ba PROGRAMA\u00c7\u00c3O ULTRACARGO']=fmtVal(r[alt]);
             }
-            if(!rec['CLIENTE/TERMINAL']&&!rec['QUANTIDADE'])return;
+            if(!rec['CLIENTE/TERMINAL'] && !rec['QUANTIDADE']) return;
             newSR.push(rec);
           });
+
         } else if(isSaidaDiv){
           const KEYS=['CLIENTE/TERMINAL','PRODUTO','DATA','GEF','TERMINAL ORIGEM',
                       'QUANTIDADE','NF VENDA INPASA','TEXTO LIVRE',
                       'SEMANA','MODAL','TERMINAL DESTINO','STATUS','RETORNO'];
           rows.forEach(r=>{
             const rec=toRec(r,KEYS);
-            if(!rec['CLIENTE/TERMINAL']&&!rec['QUANTIDADE'])return;
+            if(!rec['CLIENTE/TERMINAL'] && !rec['QUANTIDADE']) return;
             newSD.push(rec);
           });
         }
-        // demais abas (DASH_*, BOMBEIOS, OVERVIEW etc.) => ignoradas
       });
 
       const total=newE.length+newSD.length+newSR.length;
-      if(!total){toast('Nenhum dado compatible encontrado. Verifique se o arquivo contem as abas ENTRADAS, SAIDAS_DIVERSOS e SAIDAS_RODO.','error');return;}
+      if(!total){
+        toast('Nenhum dado encontrado. Verifique se o arquivo possui as abas: ENTRADAS, SA\u00cdDAS_DIVERSOS e SA\u00cdDAS_RODO.','error');
+        return;
+      }
 
       document.getElementById('import-summary').innerHTML=`
-        <p style="color:var(--txt2);font-size:13px;margin-bottom:12px">Arquivo lido com sucesso. Dados encontrados:</p>
+        <p style="color:var(--txt2);font-size:13px;margin-bottom:12px">Arquivo lido com sucesso:</p>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
           <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center">
             <div style="font-size:22px;font-weight:700;color:var(--blue)">${newE.length}</div>
-            <div style="font-size:11px;color:var(--txt3);margin-top:3px">Entradas</div></div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:3px">Entradas</div>
+          </div>
           <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center">
             <div style="font-size:22px;font-weight:700;color:var(--green)">${newSD.length}</div>
-            <div style="font-size:11px;color:var(--txt3);margin-top:3px">Saidas Diversos</div></div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:3px">Saidas Diversos</div>
+          </div>
           <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center">
             <div style="font-size:22px;font-weight:700;color:var(--cyan)">${newSR.length}</div>
-            <div style="font-size:11px;color:var(--txt3);margin-top:3px">Saidas Rodo</div></div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:3px">Saidas Rodo</div>
+          </div>
         </div>
-        <p style="color:var(--txt2);font-size:13px">Como deseja importar?</p>`;
+        <p style="color:var(--txt2);font-size:13px">Como deseja importar os dados?</p>`;
       window._pendingImport={newE,newSD,newSR};
       openModal('mo-import-confirm');
     }catch(err){
@@ -1160,6 +1218,7 @@ function handleImport(input){
   };
   reader.readAsArrayBuffer(file);
 }
+
 
 function doImportReplace(){
   const {newE,newSD,newSR}=window._pendingImport||{};
@@ -1875,6 +1934,79 @@ async function bootApp(){
     await bootApp();
   }
 })();
+
+function openEditProfile(){
+  closeModal('mo-user-menu');
+  const err=document.getElementById('profile-edit-error');
+  if(err)err.classList.remove('show');
+  document.getElementById('ep-name').value=currentProfile?.name||'';
+  document.getElementById('ep-email').value=currentProfile?.email||currentUser?.email||'';
+  document.getElementById('ep-password').value='';
+  document.getElementById('ep-password2').value='';
+  openModal('mo-edit-profile');
+}
+
+async function saveProfile(){
+  const btn=document.getElementById('btn-save-profile');
+  const errEl=document.getElementById('profile-edit-error');
+  errEl.classList.remove('show');
+  btn.disabled=true; btn.textContent='Salvando...';
+
+  const name   = document.getElementById('ep-name').value.trim();
+  const email  = document.getElementById('ep-email').value.trim();
+  const pass   = document.getElementById('ep-password').value;
+  const pass2  = document.getElementById('ep-password2').value;
+
+  if(!name){errEl.textContent='Informe o nome.';errEl.classList.add('show');btn.disabled=false;btn.textContent='Salvar alteracoes';return;}
+  if(!email){errEl.textContent='Informe o e-mail.';errEl.classList.add('show');btn.disabled=false;btn.textContent='Salvar alteracoes';return;}
+  if(pass && pass!==pass2){errEl.textContent='As senhas nao coincidem.';errEl.classList.add('show');btn.disabled=false;btn.textContent='Salvar alteracoes';return;}
+  if(pass && pass.length<6){errEl.textContent='A senha deve ter pelo menos 6 caracteres.';errEl.classList.add('show');btn.disabled=false;btn.textContent='Salvar alteracoes';return;}
+
+  if(!firebaseAvailable||!currentUser){toast('Firebase nao disponivel.','error');btn.disabled=false;btn.textContent='Salvar alteracoes';return;}
+
+  try{
+    const {updateProfile,updateEmail,updatePassword,EmailAuthProvider,reauthenticateWithCredential}=
+      await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+    const {doc,setDoc}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+
+    // Update displayName
+    await updateProfile(currentUser,{displayName:name});
+
+    // Update email if changed
+    if(email!==currentUser.email){
+      await updateEmail(currentUser,email);
+    }
+
+    // Update password if provided
+    if(pass){
+      await updatePassword(currentUser,pass);
+    }
+
+    // Update Firestore profile
+    await setDoc(doc(fbDb,'users',currentUser.uid),{
+      ...currentProfile,
+      name,
+      email,
+      updatedAt:new Date().toISOString()
+    },{merge:true});
+
+    // Update local profile
+    currentProfile={...currentProfile,name,email};
+    updateUserBadge();
+    closeModal('mo-edit-profile');
+    toast('Perfil atualizado com sucesso!','success');
+
+  }catch(err){
+    const msgs={
+      'auth/requires-recent-login':'Por seguranca, faca logout e login novamente antes de alterar e-mail ou senha.',
+      'auth/email-already-in-use':'Este e-mail ja esta em uso.',
+      'auth/invalid-email':'E-mail invalido.',
+      'auth/weak-password':'Senha fraca. Use pelo menos 6 caracteres.',
+    };
+    errEl.textContent=msgs[err.code]||('Erro: '+err.message);
+    errEl.classList.add('show');
+  }
+  btn.disabled=false; btn.textContent='Salvar alteracoes';
+}
+
 </script>
-</body>
-</html>
