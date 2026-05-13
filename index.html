@@ -1105,116 +1105,115 @@ function handleImport(input){
       const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
       let newE=[],newSD=[],newSR=[];
 
-      console.log('[Import] Abas no arquivo:', wb.SheetNames);
+      // Normaliza nome removendo acentos e espacos para comparacao segura
+      const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
 
-      wb.SheetNames.forEach(function(sheetName){
+      wb.SheetNames.forEach(sheetName=>{
+        const nameNorm=norm(sheetName);
         const ws=wb.Sheets[sheetName];
         const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-        if(!rows.length) return;
+        if(!rows.length)return;
+        const cols=Object.keys(rows[0]).map(c=>String(c).trim().toUpperCase());
 
-        // Normaliza: remove acentos, maiusculo, sem espacos extras
-        function normStr(s){
-          return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
-        }
-        const nameNorm = normStr(sheetName);
-        console.log('[Import] Aba: "'+sheetName+'" norm: "'+nameNorm+'"');
-
+        // Detecta tipo pelo nome da aba — robusto a acentos e variantes
         const isEntradas = nameNorm === 'ENTRADAS';
-        const isRodo     = nameNorm === 'SAIDAS_RODO' || nameNorm === 'SAIDAS RODO';
-        const isSaidaDiv = nameNorm === 'SAIDAS_DIVERSOS' || nameNorm === 'SAIDAS DIVERSOS';
-
-        console.log('[Import] E:'+isEntradas+' SR:'+isRodo+' SD:'+isSaidaDiv);
-
+        const isRodo     = nameNorm.startsWith('SAIDAS') && nameNorm.includes('RODO');
+        const isSaidaDiv = nameNorm.startsWith('SAIDAS') && nameNorm.includes('DIVERSOS');
+        console.log('[Import] Aba:', JSON.stringify(sheetName), '| norm:', nameNorm,
+          '| E:', isEntradas, '| SR:', isRodo, '| SD:', isSaidaDiv);
+        // Se nao for nenhuma das 3 abas operacionais, ignora
         if(!isEntradas && !isRodo && !isSaidaDiv) return;
 
-        function fmtVal(v){
+        const fmtVal=v=>{
           if(v===''||v===null||v===undefined)return'';
           if(v instanceof Date)return v.toISOString().slice(0,10);
-          var s=String(v).trim();
-          if(/^\d{5}$/.test(s)){var d=new Date((parseInt(s)-25569)*86400000);return d.toISOString().slice(0,10);}
+          const s=String(v).trim();
+          if(/^\d{5}$/.test(s)){const d=new Date((parseInt(s)-25569)*86400000);return d.toISOString().slice(0,10);}
           return s;
-        }
-        function findKey(r,k){
+        };
+
+        // Busca chave no registro ignorando acentos e case
+        const findKey=(r,k)=>{
           if(k in r) return r[k];
-          var kn=normStr(k);
-          var keys=Object.keys(r);
-          for(var i=0;i<keys.length;i++){if(normStr(keys[i])===kn)return r[keys[i]];}
-          return '';
-        }
-        function toRec(r,keys){
-          var rec={};
-          keys.forEach(function(k){rec[k]=fmtVal(findKey(r,k));});
+          const kn=norm(k);
+          const match=Object.keys(r).find(rk=>norm(rk)===kn);
+          return match!==undefined ? r[match] : '';
+        };
+
+        const toRec=(r,keys)=>{
+          const rec={};
+          keys.forEach(k=>{rec[k]=fmtVal(findKey(r,k))});
           return rec;
-        }
+        };
 
         if(isEntradas){
-          var KEYS=['TIPO','MODAL','TIPO2','PRODUTO','DATA DE REFERENCIA','DATA',
-                    'GEF ORIGEM','GEF','TERMINAL ORIGEM','TERMINAL DESTINO',
-                    'QUANTIDADE','TEXTO LIVRE','STATUS'];
-          rows.forEach(function(r){
-            var rec=toRec(r,KEYS);
+          // Usa somente as primeiras 13 colunas (ignora TIPO.1, MODAL.1, TIPO2.1)
+          const KEYS=['TIPO','MODAL','TIPO2','PRODUTO','DATA DE REFERENCIA','DATA',
+                      'GEF ORIGEM','GEF','TERMINAL ORIGEM','TERMINAL DESTINO',
+                      'QUANTIDADE','TEXTO LIVRE','STATUS'];
+          rows.forEach(r=>{
+            const rec=toRec(r,KEYS);
             if((rec['MODAL']||'').toUpperCase()==='TRANSF USINAS') return;
             if((rec['TIPO2']||'').toUpperCase()==='TRANSF USINAS') return;
-            if(!rec['TIPO']&&!rec['QUANTIDADE']) return;
+            if(!rec['TIPO'] && !rec['QUANTIDADE']) return;
             newE.push(rec);
           });
-          console.log('[Import] ENTRADAS lidas:', newE.length);
 
         } else if(isRodo){
-          var KEYS_SR=['CLIENTE/TERMINAL','TIPO','PRODUTO','DATA','GEF','TERMINAL ORIGEM',
-                       'QUANTIDADE','NF VENDA INPASA','TEXTO LIVRE',
-                       'N\u00ba PROGRAMA\u00c7\u00c3O ULTRACARGO','SEMANA','MODAL',
-                       'TERMINAL DESTINO','STATUS','RETORNO'];
-          rows.forEach(function(r){
-            var rec=toRec(r,KEYS_SR);
+          const KEYS=['CLIENTE/TERMINAL','TIPO','PRODUTO','DATA','GEF','TERMINAL ORIGEM',
+                      'QUANTIDADE','NF VENDA INPASA','TEXTO LIVRE',
+                      'N\u00ba PROGRAMA\u00c7\u00c3O ULTRACARGO','SEMANA','MODAL',
+                      'TERMINAL DESTINO','STATUS','RETORNO'];
+          rows.forEach(r=>{
+            const rec=toRec(r,KEYS);
+            // fallback para campo de programacao com grafia diferente
             if(!rec['N\u00ba PROGRAMA\u00c7\u00c3O ULTRACARGO']){
-              var alt=Object.keys(r).find(function(k){return normStr(k).indexOf('PROGRAMA')>=0;});
+              const alt=Object.keys(r).find(k=>norm(k).includes('PROGRAMA'));
               if(alt) rec['N\u00ba PROGRAMA\u00c7\u00c3O ULTRACARGO']=fmtVal(r[alt]);
             }
-            if(!rec['CLIENTE/TERMINAL']&&!rec['QUANTIDADE']) return;
+            if(!rec['CLIENTE/TERMINAL'] && !rec['QUANTIDADE']) return;
             newSR.push(rec);
           });
-          console.log('[Import] SAIDAS_RODO lidas:', newSR.length);
 
         } else if(isSaidaDiv){
-          var KEYS_SD=['CLIENTE/TERMINAL','PRODUTO','DATA','GEF','TERMINAL ORIGEM',
-                       'QUANTIDADE','NF VENDA INPASA','TEXTO LIVRE',
-                       'SEMANA','MODAL','TERMINAL DESTINO','STATUS','RETORNO'];
-          rows.forEach(function(r){
-            var rec=toRec(r,KEYS_SD);
-            if(!rec['CLIENTE/TERMINAL']&&!rec['QUANTIDADE']) return;
+          const KEYS=['CLIENTE/TERMINAL','PRODUTO','DATA','GEF','TERMINAL ORIGEM',
+                      'QUANTIDADE','NF VENDA INPASA','TEXTO LIVRE',
+                      'SEMANA','MODAL','TERMINAL DESTINO','STATUS','RETORNO'];
+          rows.forEach(r=>{
+            const rec=toRec(r,KEYS);
+            if(!rec['CLIENTE/TERMINAL'] && !rec['QUANTIDADE']) return;
             newSD.push(rec);
           });
-          console.log('[Import] SAIDAS_DIVERSOS lidas:', newSD.length);
         }
       });
 
-      var total=newE.length+newSD.length+newSR.length;
+      const total=newE.length+newSD.length+newSR.length;
       if(!total){
-        toast('Nenhum dado encontrado. Verifique se o arquivo contem as abas ENTRADAS, SAIDAS_DIVERSOS e SAIDAS_RODO.','error');
+        toast('Nenhum dado encontrado. Verifique se o arquivo possui as abas: ENTRADAS, SA\u00cdDAS_DIVERSOS e SA\u00cdDAS_RODO.','error');
         return;
       }
 
-      document.getElementById('import-summary').innerHTML=
-        '<p style="color:var(--txt2);font-size:13px;margin-bottom:12px">Arquivo lido com sucesso:</p>'+
-        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">'+
-          '<div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center">'+
-            '<div style="font-size:22px;font-weight:700;color:var(--blue)">'+newE.length+'</div>'+
-            '<div style="font-size:11px;color:var(--txt3);margin-top:3px">Entradas</div></div>'+
-          '<div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center">'+
-            '<div style="font-size:22px;font-weight:700;color:var(--green)">'+newSD.length+'</div>'+
-            '<div style="font-size:11px;color:var(--txt3);margin-top:3px">Saidas Diversos</div></div>'+
-          '<div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center">'+
-            '<div style="font-size:22px;font-weight:700;color:var(--cyan)">'+newSR.length+'</div>'+
-            '<div style="font-size:11px;color:var(--txt3);margin-top:3px">Saidas Rodo</div></div>'+
-        '</div>'+
-        '<p style="color:var(--txt2);font-size:13px">Como deseja importar os dados?</p>';
-
-      window._pendingImport={newE:newE,newSD:newSD,newSR:newSR};
+      document.getElementById('import-summary').innerHTML=`
+        <p style="color:var(--txt2);font-size:13px;margin-bottom:12px">Arquivo lido com sucesso:</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+          <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:var(--blue)">${newE.length}</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:3px">Entradas</div>
+          </div>
+          <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:var(--green)">${newSD.length}</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:3px">Saidas Diversos</div>
+          </div>
+          <div style="background:var(--s2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:var(--cyan)">${newSR.length}</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:3px">Saidas Rodo</div>
+          </div>
+        </div>
+        <p style="color:var(--txt2);font-size:13px">Como deseja importar os dados?</p>`;
+      window._pendingImport={newE,newSD,newSR};
       openModal('mo-import-confirm');
-
     }catch(err){
-      console.error('[Import] ERRO:', err);
+      console.error(err);
       toast('Erro ao ler arquivo: '+err.message,'error');
     }
     input.value='';
