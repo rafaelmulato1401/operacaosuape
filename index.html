@@ -1119,10 +1119,8 @@ function handleImport(input){
         const isEntradas = nameNorm === 'ENTRADAS';
         const isRodo     = nameNorm.startsWith('SAIDAS') && nameNorm.includes('RODO');
         const isSaidaDiv = nameNorm.startsWith('SAIDAS') && nameNorm.includes('DIVERSOS');
-
-        console.log('[Import] Aba:', JSON.stringify(sheetName), '| Norm:', nameNorm,
-          '| isEntradas:', isEntradas, '| isRodo:', isRodo, '| isSaidaDiv:', isSaidaDiv);
-
+        console.log('[Import] Aba:', JSON.stringify(sheetName), '| norm:', nameNorm,
+          '| E:', isEntradas, '| SR:', isRodo, '| SD:', isSaidaDiv);
         // Se nao for nenhuma das 3 abas operacionais, ignora
         if(!isEntradas && !isRodo && !isSaidaDiv) return;
 
@@ -1247,21 +1245,35 @@ function doImportAppend(){
 const VOL_VEIC = 60;
 let DB_E=[], DB_SD=[], DB_SR=[];
 
-function initDB() {
+function async function initDB() {
+  // Prioridade: Firestore > localStorage > dados embutidos
+  if(firebaseAvailable && fbDb){
+    try{
+      const {collection,getDocs} =
+        await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+      const [snapE, snapSD, snapSR] = await Promise.all([
+        getDocs(collection(fbDb,'entradas')),
+        getDocs(collection(fbDb,'saidas_diversos')),
+        getDocs(collection(fbDb,'saidas_rodo')),
+      ]);
+      if(!snapE.empty)  { DB_E  = snapE.docs.map(d=>d.data());  localStorage.setItem('ip_db_e', JSON.stringify(DB_E)); }
+      else { DB_E  = JSON.parse(localStorage.getItem('ip_db_e')||'null') || [...BASE_E]; }
+      if(!snapSD.empty) { DB_SD = snapSD.docs.map(d=>d.data()); localStorage.setItem('ip_db_sd',JSON.stringify(DB_SD)); }
+      else { DB_SD = JSON.parse(localStorage.getItem('ip_db_sd')||'null') || [...BASE_SD]; }
+      if(!snapSR.empty) { DB_SR = snapSR.docs.map(d=>d.data()); localStorage.setItem('ip_db_sr',JSON.stringify(DB_SR)); }
+      else { DB_SR = JSON.parse(localStorage.getItem('ip_db_sr')||'null') || [...BASE_SR]; }
+      console.log('[initDB] Firestore: E='+DB_E.length+' SD='+DB_SD.length+' SR='+DB_SR.length);
+      return;
+    } catch(e){
+      console.warn('[initDB] Firestore falhou, usando localStorage:', e.message);
+    }
+  }
+  // Fallback: localStorage
   try {
-    const stored_e  = localStorage.getItem('ip_db_e');
-    const stored_sd = localStorage.getItem('ip_db_sd');
-    const stored_sr = localStorage.getItem('ip_db_sr');
-    DB_E  = stored_e  ? JSON.parse(stored_e)  : [...BASE_E];
-    DB_SD = stored_sd ? JSON.parse(stored_sd) : [...BASE_SD];
-    DB_SR = stored_sr ? JSON.parse(stored_sr) : [...BASE_SR];
-    // Merge user additions (legacy)
-    const ea  = JSON.parse(localStorage.getItem('ip_e')||'[]');
-    const sda = JSON.parse(localStorage.getItem('ip_sd')||'[]');
-    const sra = JSON.parse(localStorage.getItem('ip_sr')||'[]');
-    if(ea.length)  { DB_E  = [...DB_E,  ...ea];  localStorage.removeItem('ip_e'); }
-    if(sda.length) { DB_SD = [...DB_SD, ...sda]; localStorage.removeItem('ip_sd'); }
-    if(sra.length) { DB_SR = [...DB_SR, ...sra]; localStorage.removeItem('ip_sr'); }
+    DB_E  = JSON.parse(localStorage.getItem('ip_db_e') ||'null') || [...BASE_E];
+    DB_SD = JSON.parse(localStorage.getItem('ip_db_sd')||'null') || [...BASE_SD];
+    DB_SR = JSON.parse(localStorage.getItem('ip_db_sr')||'null') || [...BASE_SR];
+    console.log('[initDB] localStorage: E='+DB_E.length+' SD='+DB_SD.length+' SR='+DB_SR.length);
   } catch(e) {
     DB_E=[...BASE_E]; DB_SD=[...BASE_SD]; DB_SR=[...BASE_SR];
   }
