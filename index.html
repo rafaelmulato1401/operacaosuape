@@ -1115,15 +1115,13 @@ function handleImport(input){
         if(!rows.length)return;
         const cols=Object.keys(rows[0]).map(c=>String(c).trim().toUpperCase());
 
-        // Detecta tipo pelo nome da aba (primario) + colunas (fallback)
-        const isEntradas  = nameNorm==='ENTRADAS';
-        // Rodo: nome OU (tem CLIENTE/TERMINAL E tem campo PROGRAMA no cabecalho)
-        const hasProg = cols.some(c=>norm(c).includes('PROGRAMA'));
-        const isRodo  = nameNorm==='SAIDAS_RODO' || nameNorm==='SAIDAS RODO' ||
-                        (!isEntradas && cols.includes('CLIENTE/TERMINAL') && hasProg);
-        // Diversos: nome OU (tem CLIENTE/TERMINAL E nao tem PROGRAMA E nao eh Entradas)
-        const isSaidaDiv = nameNorm==='SAIDAS_DIVERSOS' || nameNorm==='SAIDAS DIVERSOS' ||
-                           (!isEntradas && !isRodo && cols.includes('CLIENTE/TERMINAL'));
+        // Detecta tipo pelo nome da aba — robusto a acentos e variantes
+        const isEntradas = nameNorm === 'ENTRADAS';
+        const isRodo     = nameNorm.startsWith('SAIDAS') && nameNorm.includes('RODO');
+        const isSaidaDiv = nameNorm.startsWith('SAIDAS') && nameNorm.includes('DIVERSOS');
+
+        console.log('[Import] Aba:', JSON.stringify(sheetName), '| Norm:', nameNorm,
+          '| isEntradas:', isEntradas, '| isRodo:', isRodo, '| isSaidaDiv:', isSaidaDiv);
 
         // Se nao for nenhuma das 3 abas operacionais, ignora
         if(!isEntradas && !isRodo && !isSaidaDiv) return;
