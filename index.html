@@ -1245,7 +1245,7 @@ function doImportAppend(){
 const VOL_VEIC = 60;
 let DB_E=[], DB_SD=[], DB_SR=[];
 
-function async function initDB() {
+async function initDB() {
   // Prioridade: Firestore > localStorage > dados embutidos
   if(firebaseAvailable && fbDb){
     try{
