@@ -1234,7 +1234,7 @@ function showPage(p,btn) {
   document.getElementById('page-'+p).classList.add('active');
   if(btn)btn.classList.add('active');
   curPage=p;
-  const t={dashboard:'Dashboard',rodo:'Painel Rodoviario',entradas:'Entradas',saidas_div:'Saidas Diversos',saidas_rodo:'Saidas Rodoviario',dados:'Gerenciar Base de Dados'};
+  const t={dashboard:'Dashboard',rodo:'Painel Rodoviario',entradas:'Entradas',saidas_div:'Saidas Diversos',saidas_rodo:'Saidas Rodoviario',dados:'Gerenciar Base de Dados',usuarios:'Usuarios'};
   document.getElementById('page-title').textContent=t[p]||p;
   if(p==='dashboard')renderDashboard();
   if(p==='rodo')renderRodo();
@@ -1242,6 +1242,7 @@ function showPage(p,btn) {
   if(p==='saidas_div')renderSaidasDiv();
   if(p==='saidas_rodo')renderSaidasRodo();
   if(p==='dados')renderDadosPage();
+  if(p==='usuarios')renderUsersPage();
 }
 
 // ── MODALS ────────────────────────────────────────────────
@@ -1801,8 +1802,6 @@ function updateUserBadge(){
   });
 }
 
-const __orig_showPage=showPage;
-function showPage(p,btn){__orig_showPage(p,btn);if(p==='usuarios')renderUsersPage();}
 
 document.getElementById('login-form').addEventListener('submit',async(e)=>{
   e.preventDefault();
@@ -1849,7 +1848,9 @@ async function bootApp(){
       if(user){
         const snap=await window._fb.getDoc(window._fb.doc(fbDb,'users',user.uid));
         currentUser=user;
-        currentProfile=snap.exists()?snap.data():{name:user.displayName||user.email,role:'user',email:user.email};
+        const MASTER_EMAILS=['bruno.novaes@inpasa.com.br','rafael.mulato@inpasa.com.br'];
+        const defaultRole=MASTER_EMAILS.includes((user.email||'').toLowerCase())?'master':'user';
+        currentProfile=snap.exists()?snap.data():{name:user.displayName||user.email,role:defaultRole,email:user.email};
         await bootApp();
       }else{showLoginScreen();}
     });

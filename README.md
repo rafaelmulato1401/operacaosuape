@@ -1,21 +1,15 @@
-# INPASA — Sistema de Gestao de Estoque
+# INPASA — Gestao de Estoque
 
-## Deploy
+## Deploy no Vercel
+- Build Command: (vazio)
+- Output Directory: .
+- Install Command: (vazio)
 
-Este projeto e um arquivo HTML standalone. Nao requer build.
-
-### Vercel
-- Output Directory: `.` (raiz)
-- Build Command: *(vazio)*
-- Install Command: *(vazio)*
-
-### Firebase
+## Firebase
 Projeto: operacaosuape-edb14
-As credenciais ja estao configuradas no index.html.
+Credenciais ja configuradas no index.html.
+Adicione o dominio Vercel em: Firebase > Authentication > Dominios autorizados
 
-Adicione o dominio do Vercel em:
-Firebase Console > Authentication > Settings > Dominios autorizados
-
-### Usuarios Master
+## Usuarios Master
 - bruno.novaes@inpasa.com.br / Inpasa@123
 - rafael.mulato@inpasa.com.br / Inpasa@123
