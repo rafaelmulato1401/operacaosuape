@@ -205,6 +205,11 @@ body.light .nav-group{color:var(--txt3)}
 .theme-btn{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:var(--s2);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;flex-shrink:0;line-height:1}
 .theme-btn:hover{background:var(--s3);color:var(--txt)}
 
+
+.sdot-syncing{background:var(--yellow)!important;animation:pulse .6s infinite!important}
+.sdot-ok{background:var(--green)!important}
+.sdot-error{background:var(--red)!important;animation:none!important}
+
 </style>
 </head>
 <body>
@@ -257,7 +262,7 @@ body.light .nav-group{color:var(--txt3)}
     <button class="nav-item master-only" onclick="showPage('dados',this)"><span class="ni">&#x2699;</span>Base de Dados</button>
     <button class="nav-item master-only" onclick="showPage('usuarios',this)"><span class="ni">&#x1F464;</span>Usuarios</button>
   </nav>
-  <div class="sidebar-foot"><span class="sdot"></span>Sistema ativo</div>
+  <div class="sidebar-foot"><span class="sdot" id="sync-dot"></span><span id="sync-status">Sistema ativo</span></div>
 </aside>
 
 <!-- MAIN -->
@@ -1465,6 +1470,7 @@ function renderDashboard() {
       <td><button class="btn btn-ghost btn-sm" onclick="showPage('${r._sh==='RODO'?'rodo':r._sh==='ENTRADAS'?'entradas':'saidas_div'}',document.querySelectorAll('.nav-item')[${r._sh==='RODO'?1:r._sh==='ENTRADAS'?2:3}])">Ver</button></td>
     </tr>`).join(''):'<tr><td colspan="9"><div class="empty-state"><div class="ico">OK</div>Nenhum pendente</div></td></tr>';
   document.getElementById('badge-rodo').textContent=DB_SR.filter(r=>r.STATUS!=='FINALIZADO').length;
+  if(firebaseAvailable)startAutoSync();
 }
 
 // ── RODO ──────────────────────────────────────────────────
@@ -1787,6 +1793,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderDashboard();
   document.getElementById('last-ts').textContent='Atualizado: '+new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   document.getElementById('badge-rodo').textContent=DB_SR.filter(r=>r.STATUS!=='FINALIZADO').length;
+  if(firebaseAvailable)startAutoSync();
 });
 </script>
 <script>
@@ -1870,6 +1877,7 @@ async function bootApp(){
   }
   document.getElementById('last-ts').textContent='Atualizado: '+new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   document.getElementById('badge-rodo').textContent=DB_SR.filter(r=>r.STATUS!=='FINALIZADO').length;
+  if(firebaseAvailable)startAutoSync();
 }
 
 (async()=>{
@@ -1981,5 +1989,64 @@ function initTheme(){
     if(btn)btn.innerHTML='&#x263D;';
   }
 }
+
+
+var _syncInterval=null,_syncActive=false;
+function setSyncStatus(state,msg){
+  var dot=document.getElementById('sync-dot');
+  var txt=document.getElementById('sync-status');
+  if(dot){dot.className='sdot sdot-'+state;}
+  if(txt){txt.textContent=msg;}
+}
+async function syncData(){
+  if(_syncActive)return;
+  _syncActive=true;
+  setSyncStatus('syncing','Sincronizando...');
+  try{
+    if(!firebaseAvailable||!fbDb)throw new Error('offline');
+    var mod=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    var col=mod.collection,gd=mod.getDocs;
+    var results=await Promise.all([gd(col(fbDb,'entradas')),gd(col(fbDb,'saidas_diversos')),gd(col(fbDb,'saidas_rodo'))]);
+    var snapE=results[0],snapSD=results[1],snapSR=results[2];
+    var changed=false;
+    if(!snapE.empty){var ne=snapE.docs.map(function(d){return d.data();});if(ne.length!==DB_E.length){DB_E=ne;changed=true;}}
+    if(!snapSD.empty){var nsd=snapSD.docs.map(function(d){return d.data();});if(nsd.length!==DB_SD.length){DB_SD=nsd;changed=true;}}
+    if(!snapSR.empty){var nsr=snapSR.docs.map(function(d){return d.data();});if(nsr.length!==DB_SR.length){DB_SR=nsr;changed=true;}}
+    if(changed){
+      localStorage.setItem('ip_db_e',JSON.stringify(DB_E));
+      localStorage.setItem('ip_db_sd',JSON.stringify(DB_SD));
+      localStorage.setItem('ip_db_sr',JSON.stringify(DB_SR));
+      if(curPage==='dashboard')renderDashboard();
+      if(curPage==='rodo')renderRodo();
+      if(curPage==='entradas')renderEntradas();
+      if(curPage==='saidas_div')renderSaidasDiv();
+      if(curPage==='saidas_rodo')renderSaidasRodo();
+      if(curPage==='dados')renderDadosPage();
+      var br=document.getElementById('badge-rodo');
+      if(br)br.textContent=DB_SR.filter(function(r){return r.STATUS!=='FINALIZADO';}).length;
+      toast('Dados atualizados automaticamente','info');
+    }
+    var now=new Date();
+    var ts=now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    setSyncStatus('ok','Atualizado '+ts);
+    var lts=document.getElementById('last-ts');
+    if(lts)lts.textContent='Atualizado: '+now.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  }catch(err){
+    console.warn('[Sync]',err.message);
+    setSyncStatus('error','Sem conexao');
+  }
+  _syncActive=false;
+}
+function startAutoSync(){
+  syncData();
+  if(_syncInterval)clearInterval(_syncInterval);
+  _syncInterval=setInterval(syncData,2*60*1000);
+}
+function stopAutoSync(){
+  if(_syncInterval){clearInterval(_syncInterval);_syncInterval=null;}
+}
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden){stopAutoSync();}else{startAutoSync();}
+});
 
 </script>
