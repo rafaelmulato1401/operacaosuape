@@ -1525,13 +1525,13 @@ window.setSrPage=p=>{srPage=p;renderSaidasRodo();};
 let editEIdx=null,editSDIdx=null,editSRIdx=null;
 function openNewEntrada(){editEIdx=null;document.getElementById('mo-e-title').textContent='Nova Entrada';['i-tipo','i-modal','i-tipo2','i-prod','i-gef-orig','i-gef','i-status'].forEach(id=>{const el=document.getElementById(id);if(el)el.selectedIndex=0;});['i-dtref','i-data','i-term-orig','i-term-dest','i-qtd','i-texto'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('i-dtref').value=today();document.getElementById('i-data').value=today();openModal('mo-entrada');}
 function editEntrada(idx){editEIdx=idx;const r=DB_E[idx];document.getElementById('mo-e-title').textContent='Editar Entrada';document.getElementById('i-tipo').value=r.TIPO||'';document.getElementById('i-modal').value=r.MODAL||'';document.getElementById('i-tipo2').value=r.TIPO2||'';document.getElementById('i-prod').value=r.PRODUTO||'';document.getElementById('i-dtref').value=(r['DATA DE REFERENCIA']||'').slice(0,10);document.getElementById('i-data').value=(r.DATA||'').slice(0,10);document.getElementById('i-gef-orig').value=r['GEF ORIGEM']||'';document.getElementById('i-gef').value=r.GEF||'';document.getElementById('i-term-orig').value=r['TERMINAL ORIGEM']||'';document.getElementById('i-term-dest').value=r['TERMINAL DESTINO']||'';document.getElementById('i-qtd').value=r.QUANTIDADE||'';document.getElementById('i-status').value=r.STATUS||'';document.getElementById('i-texto').value=r['TEXTO LIVRE']||'';openModal('mo-entrada');}
-function saveEntrada(){const qtd=parseFloat(gv('i-qtd').replace(',','.'));if(isNaN(qtd)){toast('Quantidade invalida','error');return;}const rec={'TIPO':gv('i-tipo'),'MODAL':gv('i-modal'),'TIPO2':gv('i-tipo2'),'PRODUTO':gv('i-prod'),'DATA DE REFERENCIA':gv('i-dtref'),'DATA':gv('i-data'),'GEF ORIGEM':gv('i-gef-orig'),'GEF':gv('i-gef'),'TERMINAL ORIGEM':gv('i-term-orig'),'TERMINAL DESTINO':gv('i-term-dest'),'QUANTIDADE':qtd,'STATUS':gv('i-status'),'TEXTO LIVRE':gv('i-texto')};if(editEIdx!==null){DB_E[editEIdx]=rec;toast('Entrada atualizada','success');}else{DB_E.push(rec);toast('Entrada salva','success');}saveDB();closeModal('mo-entrada');renderDashboard();if(curPage==='entradas')renderEntradas();}
+function saveEntrada(){const qtd=parseFloat(gv('i-qtd').replace(',','.'));if(isNaN(qtd)){toast('Quantidade invalida','error');return;}const rec={'TIPO':gv('i-tipo'),'MODAL':gv('i-modal'),'TIPO2':gv('i-tipo2'),'PRODUTO':gv('i-prod'),'DATA DE REFERENCIA':gv('i-dtref'),'DATA':gv('i-data'),'GEF ORIGEM':gv('i-gef-orig'),'GEF':gv('i-gef'),'TERMINAL ORIGEM':gv('i-term-orig'),'TERMINAL DESTINO':gv('i-term-dest'),'QUANTIDADE':qtd,'STATUS':gv('i-status'),'TEXTO LIVRE':gv('i-texto')};if(editEIdx!==null){DB_E[editEIdx]=rec;toast('Entrada atualizada','success');}else{DB_E.push(rec);toast('Entrada salva','success');}saveDB();closeModal('mo-entrada');renderDashboard();if(curPage==='entradas')renderEntradas();fsSaveRecordBg('entradas',rec,editEIdx!==null?DB_E.indexOf(rec):null);}
 function openNewSaidaDiv(){editSDIdx=null;document.getElementById('mo-sd-title').textContent='Nova Saida Diversos';['sd-cliente','sd-term-orig','sd-term-dest','sd-qtd','sd-nf','sd-retorno','sd-texto'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('sd-dtref').value=today();openModal('mo-sd');}
 function editSaidaDiv(idx){editSDIdx=idx;const r=DB_SD[idx];document.getElementById('mo-sd-title').textContent='Editar Saida Diversos';document.getElementById('sd-cliente').value=r['CLIENTE/TERMINAL']||'';document.getElementById('sd-prod').value=r.PRODUTO||'';document.getElementById('sd-dtref').value=(r.DATA||'').slice(0,10);document.getElementById('sd-gef').value=r.GEF||'';document.getElementById('sd-term-orig').value=r['TERMINAL ORIGEM']||'';document.getElementById('sd-term-dest').value=r['TERMINAL DESTINO']||'';document.getElementById('sd-qtd').value=r.QUANTIDADE||'';document.getElementById('sd-nf').value=r['NF VENDA INPASA']||'';document.getElementById('sd-modal').value=r.MODAL||'';document.getElementById('sd-retorno').value=r.RETORNO||'';document.getElementById('sd-status').value=r.STATUS||'';document.getElementById('sd-texto').value=r['TEXTO LIVRE']||'';openModal('mo-sd');}
-function saveSaidaDiv(){const qtd=parseFloat(gv('sd-qtd').replace(',','.'));if(isNaN(qtd)){toast('Quantidade invalida','error');return;}const rec={'CLIENTE/TERMINAL':gv('sd-cliente'),'PRODUTO':gv('sd-prod'),'DATA':gv('sd-dtref'),'GEF':gv('sd-gef'),'TERMINAL ORIGEM':gv('sd-term-orig'),'TERMINAL DESTINO':gv('sd-term-dest'),'QUANTIDADE':qtd,'NF VENDA INPASA':gv('sd-nf'),'MODAL':gv('sd-modal'),'RETORNO':gv('sd-retorno'),'STATUS':gv('sd-status'),'TEXTO LIVRE':gv('sd-texto')};if(editSDIdx!==null){DB_SD[editSDIdx]=rec;toast('Atualizado','success');}else{DB_SD.push(rec);toast('Salvo','success');}saveDB();closeModal('mo-sd');renderDashboard();if(curPage==='saidas_div')renderSaidasDiv();}
+function saveSaidaDiv(){const qtd=parseFloat(gv('sd-qtd').replace(',','.'));if(isNaN(qtd)){toast('Quantidade invalida','error');return;}const rec={'CLIENTE/TERMINAL':gv('sd-cliente'),'PRODUTO':gv('sd-prod'),'DATA':gv('sd-dtref'),'GEF':gv('sd-gef'),'TERMINAL ORIGEM':gv('sd-term-orig'),'TERMINAL DESTINO':gv('sd-term-dest'),'QUANTIDADE':qtd,'NF VENDA INPASA':gv('sd-nf'),'MODAL':gv('sd-modal'),'RETORNO':gv('sd-retorno'),'STATUS':gv('sd-status'),'TEXTO LIVRE':gv('sd-texto')};if(editSDIdx!==null){DB_SD[editSDIdx]=rec;toast('Atualizado','success');}else{DB_SD.push(rec);toast('Salvo','success');}saveDB();closeModal('mo-sd');renderDashboard();if(curPage==='saidas_div')renderSaidasDiv();fsSaveRecordBg('saidas_diversos',rec,null);}
 function openNewSaidaRodo(){editSRIdx=null;document.getElementById('mo-sr-title').textContent='Nova Saida Rodoviario';['sr-cliente','sr-term-orig','sr-term-dest','sr-qtd','sr-nf','sr-prog','sr-retorno','sr-texto'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('sr-dtref').value=today();document.getElementById('sr-status').value='PREVISTO';openModal('mo-sr');}
 function editSaidaRodo(idx){editSRIdx=idx;const r=DB_SR[idx];document.getElementById('mo-sr-title').textContent='Editar Saida Rodoviario';document.getElementById('sr-cliente').value=r['CLIENTE/TERMINAL']||'';document.getElementById('sr-tipo').value=r.TIPO||'';document.getElementById('sr-prod').value=r.PRODUTO||'';document.getElementById('sr-dtref').value=(r.DATA||'').slice(0,10);document.getElementById('sr-gef').value=r.GEF||'';document.getElementById('sr-term-orig').value=r['TERMINAL ORIGEM']||'';document.getElementById('sr-term-dest').value=r['TERMINAL DESTINO']||'';document.getElementById('sr-qtd').value=r.QUANTIDADE||'';document.getElementById('sr-nf').value=r['NF VENDA INPASA']||'';document.getElementById('sr-prog').value=r['Nº PROGRAMAÇÃO ULTRACARGO']||'';document.getElementById('sr-semana').value=r.SEMANA||'';document.getElementById('sr-retorno').value=r.RETORNO||'';document.getElementById('sr-status').value=r.STATUS||'';document.getElementById('sr-texto').value=r['TEXTO LIVRE']||'';openModal('mo-sr');}
-function saveSaidaRodo(){const qtd=parseFloat(gv('sr-qtd').replace(',','.'));if(isNaN(qtd)){toast('Quantidade invalida','error');return;}const rec={'CLIENTE/TERMINAL':gv('sr-cliente'),'TIPO':gv('sr-tipo'),'PRODUTO':gv('sr-prod'),'DATA':gv('sr-dtref'),'GEF':gv('sr-gef'),'TERMINAL ORIGEM':gv('sr-term-orig'),'TERMINAL DESTINO':gv('sr-term-dest'),'QUANTIDADE':qtd,'NF VENDA INPASA':gv('sr-nf'),'Nº PROGRAMAÇÃO ULTRACARGO':gv('sr-prog'),'SEMANA':gv('sr-semana'),'RETORNO':gv('sr-retorno'),'STATUS':gv('sr-status'),'TEXTO LIVRE':gv('sr-texto'),'MODAL':'RODOVIARIO'};if(editSRIdx!==null){DB_SR[editSRIdx]=rec;toast('Atualizado','success');}else{DB_SR.push(rec);toast('Salvo','success');}saveDB();closeModal('mo-sr');renderDashboard();renderRodo();if(curPage==='saidas_rodo')renderSaidasRodo();}
+function saveSaidaRodo(){const qtd=parseFloat(gv('sr-qtd').replace(',','.'));if(isNaN(qtd)){toast('Quantidade invalida','error');return;}const rec={'CLIENTE/TERMINAL':gv('sr-cliente'),'TIPO':gv('sr-tipo'),'PRODUTO':gv('sr-prod'),'DATA':gv('sr-dtref'),'GEF':gv('sr-gef'),'TERMINAL ORIGEM':gv('sr-term-orig'),'TERMINAL DESTINO':gv('sr-term-dest'),'QUANTIDADE':qtd,'NF VENDA INPASA':gv('sr-nf'),'Nº PROGRAMAÇÃO ULTRACARGO':gv('sr-prog'),'SEMANA':gv('sr-semana'),'RETORNO':gv('sr-retorno'),'STATUS':gv('sr-status'),'TEXTO LIVRE':gv('sr-texto'),'MODAL':'RODOVIARIO'};if(editSRIdx!==null){DB_SR[editSRIdx]=rec;toast('Atualizado','success');}else{DB_SR.push(rec);toast('Salvo','success');}saveDB();closeModal('mo-sr');renderDashboard();renderRodo();if(curPage==='saidas_rodo')renderSaidasRodo();fsSaveRecordBg('saidas_rodo',rec,null);}
 
 // ── BASE DE DADOS PAGE ─────────────────────────────────────
 function renderDadosPage(){
@@ -2038,6 +2038,7 @@ async function syncData(){
   _syncActive=false;
 }
 function startAutoSync(){
+  flushOfflineQueue();
   syncData();
   if(_syncInterval)clearInterval(_syncInterval);
   _syncInterval=setInterval(syncData,2*60*1000);
@@ -2048,5 +2049,52 @@ function stopAutoSync(){
 document.addEventListener('visibilitychange',function(){
   if(document.hidden){stopAutoSync();}else{startAutoSync();}
 });
+
+
+// Salva registro no Firestore em background (sem bloquear UI)
+async function fsSaveRecordBg(colName, record, existingId) {
+  if(!firebaseAvailable || !fbDb) return;
+  try {
+    var mod = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    var data = Object.assign({}, record, {_updatedAt: new Date().toISOString()});
+    if(existingId !== null && existingId !== undefined) {
+      // Tenta buscar o doc pelo _id se existir
+      var docId = record._id || null;
+      if(docId) {
+        await mod.setDoc(mod.doc(fbDb, colName, docId), data, {merge: true});
+      } else {
+        // Sem ID especifico, adiciona como novo
+        await mod.addDoc(mod.collection(fbDb, colName), data);
+      }
+    } else {
+      var ref = await mod.addDoc(mod.collection(fbDb, colName), data);
+      record._id = ref.id; // guarda o ID gerado
+    }
+    console.log('[FS] Salvo em', colName);
+  } catch(err) {
+    console.warn('[FS] Erro ao salvar em', colName, ':', err.message);
+    // Adiciona a fila offline para tentar depois
+    var q = JSON.parse(localStorage.getItem('ip_offline') || '[]');
+    q.push({colName: colName, record: record, ts: Date.now()});
+    localStorage.setItem('ip_offline', JSON.stringify(q));
+  }
+}
+
+// Tenta sincronizar fila offline quando reconectar
+async function flushOfflineQueue() {
+  var q = JSON.parse(localStorage.getItem('ip_offline') || '[]');
+  if(!q.length || !firebaseAvailable || !fbDb) return;
+  var mod = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+  var remaining = [];
+  for(var i = 0; i < q.length; i++) {
+    try {
+      await mod.addDoc(mod.collection(fbDb, q[i].colName), q[i].record);
+    } catch(e) {
+      remaining.push(q[i]);
+    }
+  }
+  localStorage.setItem('ip_offline', JSON.stringify(remaining));
+  if(remaining.length < q.length) console.log('[FS] Fila offline sincronizada:', q.length - remaining.length, 'registros');
+}
 
 </script>
