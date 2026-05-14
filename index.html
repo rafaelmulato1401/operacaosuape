@@ -1263,15 +1263,56 @@ function handleImport(input){
 }
 
 
-function doImportReplace(){
+async function doImportReplace(){
   const {newE,newSD,newSR}=window._pendingImport||{};
   if(!newE)return;
   if(newE.length) DB_E=newE;
   if(newSD.length)DB_SD=newSD;
   if(newSR.length)DB_SR=newSR;
-  saveDB();closeModal('mo-import-confirm');
-  toast(`Base substituida: ${DB_E.length+DB_SD.length+DB_SR.length} registros carregados`,'success');
-  renderDashboard();renderDadosPage();window._pendingImport=null;
+  saveDB();
+  closeModal('mo-import-confirm');
+  toast('Base substituida localmente. Sincronizando com Firebase...','info');
+  renderDashboard();renderDadosPage();
+  window._pendingImport=null;
+  // Sincroniza com Firestore
+  if(firebaseAvailable && fbDb){
+    try{
+      var mod=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+      var pairs=[
+        {col:'entradas',data:DB_E},
+        {col:'saidas_diversos',data:DB_SD},
+        {col:'saidas_rodo',data:DB_SR}
+      ];
+      for(var pi=0;pi<pairs.length;pi++){
+        var colName=pairs[pi].col, data=pairs[pi].data;
+        // 1. Apaga docs existentes
+        var snap=await mod.getDocs(mod.collection(fbDb,colName));
+        if(!snap.empty){
+          var CHUNK=400;
+          for(var ci=0;ci<snap.docs.length;ci+=CHUNK){
+            var batch=mod.writeBatch(fbDb);
+            snap.docs.slice(ci,ci+CHUNK).forEach(function(d){batch.delete(d.ref);});
+            await batch.commit();
+          }
+        }
+        // 2. Insere novos em batch
+        var CHUNK2=400;
+        for(var di=0;di<data.length;di+=CHUNK2){
+          var batch2=mod.writeBatch(fbDb);
+          data.slice(di,di+CHUNK2).forEach(function(r){
+            var ref=mod.doc(mod.collection(fbDb,colName));
+            batch2.set(ref,Object.assign({},r,{_importedAt:new Date().toISOString()}));
+          });
+          await batch2.commit();
+        }
+        console.log('[Import] Firestore: '+colName+' = '+data.length+' docs');
+      }
+      toast('Dados sincronizados com sucesso no Firebase!','success');
+    }catch(err){
+      console.error('[Import] Firestore erro:',err);
+      toast('Importado localmente, erro no Firebase: '+err.message,'error');
+    }
+  }
 }
 
 function doImportAppend(){
@@ -1558,13 +1599,47 @@ function checkConfirmInput(){
   const v=document.getElementById('confirm-input').value;
   document.getElementById('btn-confirm-clear').disabled=(v!=='CONFIRMAR');
 }
-function executeClearDB(){
+async function executeClearDB(){
   if(document.getElementById('confirm-input').value!=='CONFIRMAR')return;
-  if(_confirmClearTarget==='all'){DB_E=[];DB_SD=[];DB_SR=[];localStorage.removeItem('ip_db_e');localStorage.removeItem('ip_db_sd');localStorage.removeItem('ip_db_sr');toast('Base de dados completamente limpa','success');}
-  else if(_confirmClearTarget==='entradas'){DB_E=[];localStorage.removeItem('ip_db_e');toast('Entradas removidas','success');}
-  else if(_confirmClearTarget==='saidas_div'){DB_SD=[];localStorage.removeItem('ip_db_sd');toast('Saidas Diversos removidas','success');}
-  else if(_confirmClearTarget==='saidas_rodo'){DB_SR=[];localStorage.removeItem('ip_db_sr');toast('Saidas Rodo removidas','success');}
-  closeModal('mo-confirm-clear');renderDashboard();renderDadosPage();
+  var targets={
+    all:        [{key:'ip_db_e',col:'entradas'},{key:'ip_db_sd',col:'saidas_diversos'},{key:'ip_db_sr',col:'saidas_rodo'}],
+    entradas:   [{key:'ip_db_e',col:'entradas'}],
+    saidas_div: [{key:'ip_db_sd',col:'saidas_diversos'}],
+    saidas_rodo:[{key:'ip_db_sr',col:'saidas_rodo'}]
+  };
+  var list=targets[_confirmClearTarget]||[];
+  // 1. Limpa local imediatamente
+  list.forEach(function(t){
+    localStorage.removeItem(t.key);
+    if(t.col==='entradas')DB_E=[];
+    if(t.col==='saidas_diversos')DB_SD=[];
+    if(t.col==='saidas_rodo')DB_SR=[];
+  });
+  closeModal('mo-confirm-clear');
+  renderDashboard();renderDadosPage();
+  toast('Dados removidos. Sincronizando com Firebase...','info');
+  // 2. Apaga no Firestore
+  if(firebaseAvailable && fbDb){
+    try{
+      var mod=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+      for(var i=0;i<list.length;i++){
+        var snap=await mod.getDocs(mod.collection(fbDb,list[i].col));
+        if(!snap.empty){
+          var CHUNK=400;
+          for(var ci=0;ci<snap.docs.length;ci+=CHUNK){
+            var batch=mod.writeBatch(fbDb);
+            snap.docs.slice(ci,ci+CHUNK).forEach(function(d){batch.delete(d.ref);});
+            await batch.commit();
+          }
+        }
+        console.log('[Clear] Firestore: '+list[i].col+' limpo');
+      }
+      toast('Base excluida com sucesso no Firebase!','success');
+    }catch(err){
+      console.error('[Clear] Firestore erro:',err);
+      toast('Local limpo, erro no Firebase: '+err.message,'error');
+    }
+  }
 }
 
 // ── CSV EXPORT ─────────────────────────────────────────────
